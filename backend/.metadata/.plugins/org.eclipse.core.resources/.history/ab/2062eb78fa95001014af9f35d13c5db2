@@ -1,0 +1,74 @@
+package com.digitalwallet.backend.controller;
+
+import com.digitalwallet.backend.model.PaymentRequest;
+import com.digitalwallet.backend.repository.PaymentRequestRepository;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/qr")
+public class QrController {
+
+    private final PaymentRequestRepository paymentRequestRepository;
+
+    public QrController(PaymentRequestRepository paymentRequestRepository) {
+        this.paymentRequestRepository = paymentRequestRepository;
+    }
+
+    // create a payment request (authenticated user creates a request to receive money)
+    @PostMapping("/create")
+    public ResponseEntity<?> createPaymentRequest(Authentication authentication,
+                                                  @Valid @RequestBody CreateQrRequest req) {
+        // optional: ensure authenticated user exists; we store recipient as user's wallet
+        UUID id = UUID.randomUUID();
+        String token = id.toString(); // token used to embed in QR (you may also base64 or sign it)
+
+        PaymentRequest p = new PaymentRequest();
+        p.setId(id);
+        p.setToken(token);
+        p.setAmount(req.getAmount());
+        p.setCurrency(req.getCurrency() == null ? "INR" : req.getCurrency());
+        // store toWalletId as the current user's wallet id if you want:
+        // p.setToWalletId(UUID.fromString(authentication.getName()));
+        p.setCreatedAt(Instant.now());
+
+        paymentRequestRepository.save(p);
+
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("id", id.toString());
+        resp.put("token", token);
+        resp.put("amount", p.getAmount());
+        resp.put("currency", p.getCurrency());
+        resp.put("createdAt", p.getCreatedAt().toString());
+        // frontend uses token to generate QR content
+        return ResponseEntity.ok(resp);
+    }
+
+    // optional: endpoint to fetch payment request details by token
+    @GetMapping("/request/{token}")
+    public ResponseEntity<?> getRequest(@PathVariable String token) {
+        return paymentRequestRepository.findByToken(token)
+            .map(pr -> ResponseEntity.ok(pr))
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // DTO for create request
+    public static class CreateQrRequest {
+        private BigDecimal amount;
+        private String currency;
+
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+        public String getCurrency() { return currency; }
+        public void setCurrency(String currency) { this.currency = currency; }
+    }
+}

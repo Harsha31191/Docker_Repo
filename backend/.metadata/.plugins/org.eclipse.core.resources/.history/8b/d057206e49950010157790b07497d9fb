@@ -1,0 +1,5 @@
+package com.digitalwallet.backend.dto;
+
+public class TokenResponse {
+
+}

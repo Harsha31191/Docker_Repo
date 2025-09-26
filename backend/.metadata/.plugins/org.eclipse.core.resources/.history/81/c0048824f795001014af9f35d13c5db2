@@ -1,0 +1,5 @@
+package com.digitalwallet.backend.model;
+
+public class Transactions {
+
+}

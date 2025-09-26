@@ -1,0 +1,38 @@
+package com.digitalwallet.backend.service;
+
+import com.digitalwallet.backend.model.User;
+import com.digitalwallet.backend.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class AuthService {
+
+  private final UserRepository userRepository;
+  private final PasswordEncoder passwordEncoder;
+
+  public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    this.userRepository = userRepository;
+    this.passwordEncoder = passwordEncoder;
+  }
+
+  // ⭐ updated method signature to include phone
+  public void register(String fullName, String email, String phone, String password) {
+    if (userRepository.existsByEmail(email)) {
+      throw new RuntimeException("Email already exists");
+    }
+    if (userRepository.existsByPhone(phone)) {
+      throw new RuntimeException("Phone already exists");
+    }
+
+    User user = new User();
+    user.setFullName(fullName);
+    user.setEmail(email);
+    user.setPhone(phone); // ⭐ save phone
+    user.setPasswordHash(passwordEncoder.encode(password));
+
+    userRepository.save(user);
+  }
+
+  // keep your existing loginAndCreateToken() as is
+}

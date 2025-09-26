@@ -1,0 +1,119 @@
+package com.digitalwallet.backend.service;
+
+import com.digitalwallet.backend.model.AuthToken;
+import com.digitalwallet.backend.model.User;
+import com.digitalwallet.backend.model.Wallet;
+import com.digitalwallet.backend.repository.AuthTokenRepository;
+import com.digitalwallet.backend.repository.UserRepository;
+import com.digitalwallet.backend.repository.WalletRepository;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final WalletRepository walletRepository;
+    private final AuthTokenRepository authTokenRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public AuthService(UserRepository userRepository,
+                       WalletRepository walletRepository,
+                       AuthTokenRepository authTokenRepository,
+                       PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.walletRepository = walletRepository;
+        this.authTokenRepository = authTokenRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    /**
+     * Register a new user and create an empty wallet.
+     * Throws IllegalArgumentException for user-caused errors (e.g. email exists).
+     */
+    @Transactional
+    public void register(String fullName, String email, String password) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        if (password == null || password.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters");
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+
+        try {
+            User user = new User();
+            user.setFullName(fullName);
+            user.setEmail(email);
+            user.setPasswordHash(passwordEncoder.encode(password));
+            userRepository.save(user);
+
+            // create wallet
+            Wallet wallet = new Wallet();
+            wallet.setUser(user);
+            walletRepository.save(wallet);
+        } catch (DataIntegrityViolationException ex) {
+            // unique constraint or similar - present friendly message
+            throw new IllegalArgumentException("Email already registered");
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to register user: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Authenticate and create a token string persisted in auth_tokens table.
+     * Returns the token string which the client must store.
+     */
+    @Transactional
+    public String loginAndCreateToken(String email, String password) {
+        if (email == null || password == null) {
+            throw new IllegalArgumentException("Email and password required");
+        }
+
+        Optional<User> ou = userRepository.findByEmail(email);
+        if (ou.isEmpty()) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
+
+        User user = ou.get();
+        boolean ok = passwordEncoder.matches(password, user.getPasswordHash());
+        if (!ok) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
+
+        // create a new token (random, reasonably long)
+        String token = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+        AuthToken at = new AuthToken();
+        at.setToken(token);
+        at.setUser(user);
+        at.setCreatedAt(Instant.now());
+        authTokenRepository.save(at);
+
+        return token;
+    }
+
+    /**
+     * Find user by token value. Used by TokenAuthenticationFilter.
+     */
+    public Optional<User> findUserByToken(String token) {
+        if (token == null || token.trim().isEmpty()) return Optional.empty();
+        return authTokenRepository.findByToken(token).map(AuthToken::getUser);
+    }
+
+    /**
+     * Optional: revoke token (not used currently). Keeps API useful.
+     */
+    @Transactional
+    public void revokeToken(String token) {
+        if (token == null) return;
+        authTokenRepository.deleteByToken(token);
+    }
+}

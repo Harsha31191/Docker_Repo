@@ -1,0 +1,12 @@
+spring.application.name=digitalwallet_backend
+spring.datasource.url=jdbc:mysql://localhost:3306/digital_wallet?useSSL=false&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=Harsha@123
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+
+# CORS origin used by your frontend
+cors.allowed-origins=http://localhost:5173
+
+server.port=8080

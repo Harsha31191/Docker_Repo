@@ -1,0 +1,52 @@
+
+services:
+  frontend:
+    build:
+      context: ./frontend/DigitalWalletApp
+    container_name: react
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    restart: on-failure
+    networks:
+      - springboot-mysql-net
+
+  backend:
+    build:
+      context: ./backend/digitalwallet_backend
+      dockerfile: backend.Dockerfile
+    container_name: springboot
+    ports:
+      - "2000:8082"
+    depends_on:
+      - mysqldb
+    restart: on-failure
+    networks:
+      - springboot-mysql-net
+    environment:
+      # pass env (optional) — not required if your application.properties is hardcoded
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/digital_wallet?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Harsha@123
+
+  mysqldb:
+    image: mysql:8.0
+    container_name: mysqldb
+    environment:
+      MYSQL_ROOT_PASSWORD: Harsha@123        # <-- match your application.properties password
+      MYSQL_DATABASE: digital_wallet         # <-- match the DB name in your application.properties
+    ports:
+      - "3307:3306"
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    networks:
+      - springboot-mysql-net
+
+networks:
+  springboot-mysql-net:
+    driver: bridge

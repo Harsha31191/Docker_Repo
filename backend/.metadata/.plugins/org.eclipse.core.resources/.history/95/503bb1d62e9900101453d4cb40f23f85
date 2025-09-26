@@ -1,0 +1,11 @@
+@PostMapping("/register")
+public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
+    try {
+        authService.register(req.getFullName(), req.getEmail(), req.getPassword());
+        return ResponseEntity.ok(Map.of("message","registered"));
+    } catch (IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+    } catch (Exception ex) {
+        return ResponseEntity.internalServerError().body(Map.of("message", "Registration failed"));
+    }
+}
